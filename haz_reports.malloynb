@@ -1,0 +1,385 @@
+>>>markdown
+This is an analysis of 55 years worth of Hazmat Transportation Incident Reports. "Federal law requires transportation-related spills, explosions, and other safety-endangering incidents involving hazardous materials to be reported to the Pipeline and Hazardous Materials Safety Administration (PHMSA)". In the case of one of these events occuring, the responsible party  "...must submit a Hazardous Materials Incident Report on DOT Form F 5800.1 [...] within 30 days of discovery of the incident".
+>>>markdown
+This data includes relevant information the submitter of the form has included in their report such as:
+    -When the incident occurred
+    -Where the incident occurred
+    -Mode of transportation (train rail, highway, etc.)
+    -Carrier information
+    -Short and long name of the commodity that was spilled/destroyed
+    -Packaging type holding commodity
+    -Safety metrics of incident (toxicity level, whether it is safe to inhale, etc.)
+    -Code and description of what failed (caused the incident)
+
+Notes:
+-The dataset includes incidents for the year 2025, however this year was excluded due to it being an incomplete year as of the time of this analysis.
+>>>malloy
+source: haz is duckdb.sql("""
+   SELECT * FROM read_csv('data/fetched/*.csv',
+       all_varchar = true
+   )
+""") extend {
+    measure:
+    total_incidents is count()
+    total_deaths is count() {where: `Hmis Serious Fatality` = 'Yes'}
+    total_injuries is count() {where: `Hmis Serious Injury` = 'Yes'}
+    environmental_damage is count() {where: `Environmental Damage Result` = 'Yes'}
+    us_incident_city is count(`Incident City`)
+    incident_us is count() {where:`Incident Country` = 'US'}
+    public_evacuated is count() {where: `Public Evacuated` = '1'}
+    employees_evacuated is count(`Employees Evacuated`)
+    dimension:
+    _incident_date is `Date Of Incident`:: date
+    _hfc is `Failure Cause Code`:: number
+    _emp_fatal is `Hazmat Fatalities Employees`::number
+    _resp_fatal is `Hazmat Fatalities Responders`::number
+    _gen_pub_fatal is `Hazmat Fatality General Public`::number
+    _month_of_year is month(_incident_date)
+    _inc_state is `Incident State`
+    where:
+    _incident_date <@2025
+}
+>>>markdown
+To begin our analysis, we need to understand the basics about the dataset we are looking at. To start, how many hazardous incidents have occurred over the course of the dataset?
+>>>malloy
+run: haz -> {
+aggregate: `Total Incidents` is total_incidents 
+}
+>>>markdown
+From these incidents, how many injuries have occurred(that were recorded)?
+>>>malloy
+run: haz -> {
+aggregate: `Total Injuries` is total_injuries
+}
+>>>markdown
+In relation to the total hazardous incidents, how many fatalities have occurred?
+>>>malloy
+run: haz -> {
+aggregate: `Total Fatalities` is total_deaths
+}
+>>>markdown
+After seeing the total injuries and fatalities, I wanted to group them together and see which cities they were coming from.
+>>>malloy
+run: haz -> {
+group_by: `Shipper City`
+aggregate: total_deaths
+aggregate: total_injuries
+where: `Incident Country` = 'US'
+}
+>>>markdown
+The dataset breaks these fatalities into three main groups: employees, responders, and general public. With that, how many of each of these groups have died do to these incidents?
+>>>markdown
+These are the total number of employee fatalities:
+>>>malloy
+run: haz -> {
+aggregate: `Total Employee Fatalities` is total_incidents {where: _emp_fatal > 0}
+}
+>>>markdown
+Next, these are the total number of responder fatalities:
+>>>malloy
+run: haz -> {
+aggregate: `Total Responder Fatalities` is total_incidents {where: _resp_fatal > 0}
+}
+>>>markdown
+Lastly, these are the number of general public fatalities:
+>>>malloy
+run: haz -> {
+aggregate: `Total General Public Fatalities` is total_incidents {where: _gen_pub_fatal > 0}
+}
+>>>markdown
+How many times have hazardous incidents had an effect on the environment?
+>>>malloy
+run: haz -> {
+aggregate:
+`Environmental Damage Occurred` is total_incidents {where: `Environmental Damage Result` = "Yes"}
+}
+>>>markdown
+How many times have these incidents caused an explosion?
+>>>malloy
+run: haz -> {
+aggregate:
+`Explosion Occurred` is total_incidents {where: `Explosion Result Ind` = "Yes"}
+}
+>>>markdown
+How many of these incidents caused a gas leak?
+>>>malloy
+run: haz -> {
+aggregate:
+`Gas Leak Occurred` is total_incidents {where: `Gas Dispersion Result Ind` = "Yes"}
+}
+>>>markdown
+How many fires started due to these incidents?
+>>>malloy
+run: haz -> {
+aggregate:
+`Fire Occurred` is total_incidents {where: `Fire Result Ind` = "Yes"}
+}
+>>>markdown
+How many times were the fire department called compared to the number of fires that started?
+>>>malloy
+run: haz -> {
+aggregate:
+`Fire Dept. Dispatched` is total_incidents {where: `Fire Ems Report Ind` = "Yes"}
+`Fire Occurred` is total_incidents {where: `Fire Result Ind` = "Yes"}
+}
+>>>markdown
+How many incidents caused a releasement of radioactive material?
+>>>malloy
+run: haz -> {
+aggregate:
+`Releasement of Radiation` is total_incidents {where: `Hmis Serious Radioactive` = "Yes"}
+}
+>>>markdown
+Radioactive incidents by city:
+>>>malloy
+run: haz -> {
+group_by:
+`Incident City`
+aggregate:
+`Releasement of Radiation ` is total_incidents {where: `Hmis Serious Radioactive` = "Yes"}
+}
+>>>markdown
+Radioactive incidents by state:
+>>>malloy
+run: haz -> {
+group_by:
+`Incident State`
+aggregate:
+`Releasement of Radiation ` is total_incidents {where: `Hmis Serious Radioactive` = "Yes"}
+}
+>>>markdown
+Deaths caused by exposure to radiation:
+>>>malloy
+run: haz -> {
+aggregate:
+`Releasement of Radiation ` is total_incidents {where: `Hmis Serious Radioactive` = "Yes"}
+`Total General Public Fatalities` is total_incidents {where: _gen_pub_fatal > 0}
+`Total Employee Fatalities` is total_incidents {where: _emp_fatal > 0}
+}
+>>>markdown
+How many incidents released toxic fumes?
+>>>malloy
+run: haz -> {
+aggregate:
+`Releasement of Toxic Fumes` is total_incidents {where: `Toxic By Inhalation Ind` = "Yes"}
+}
+>>>markdown
+How many incidents involving gas leaks also involved toxic fumes?
+>>>malloy
+run: haz -> {
+aggregate:
+`Gas Leak Occurred` is total_incidents {where: `Gas Dispersion Result Ind` = "Yes"}
+`Releasement of Toxic Fumes` is total_incidents {where: `Toxic By Inhalation Ind` = "Yes"}
+}
+>>>markdown
+Deaths caused by exposure to toxic fumes:
+>>>malloy
+run: haz -> {
+aggregate:
+`Releasement of Toxic Fumes` is total_incidents {where: `Toxic By Inhalation Ind` = "Yes"}
+`Total General Public Fatalities` is total_incidents {where: _gen_pub_fatal > 0}
+`Total Employee Fatalities` is total_incidents {where: _emp_fatal > 0}
+}
+>>>markdown
+With many of these incidents having caused some form of damage, the next question you may be asking is what the total dollar amount might be. While this dataset does not include the specific cost in damages from these incidents, it does include whether the incident caused over $500 in damages, which has been aggregated below.
+>>>malloy
+run: haz -> {
+aggregate: `Instances When Damages Were Over $500` is total_incidents {where: `Damage More Than 500` = "Yes"}
+}
+>>>markdown
+Many of these incidents have also occured in populated areas, warranting an evacuation of the area. With that in mind, how many evacuations occured from these incidents?
+>>>malloy
+run: haz -> {
+aggregate:
+`Evacuation Occurred` is total_incidents {where: `Evacuation Indicator` = "Yes"}
+}
+>>>markdown
+Due to many of these incidents happening within cities, entire city districts have had to be evacuated. The below query breaks down the total number of evacuations based on which city they were in. 
+>>>malloy
+run: haz -> {
+group_by:
+`Incident City`
+aggregate:
+`Evacuation Occurred` is total_incidents {where: `Evacuation Indicator` = "Yes"}
+}
+>>>markdown
+Next I wanted to look specifically at cities that were within the U.S. (Cities in U.S. States)
+>>>malloy
+run: haz -> {
+group_by: `Shipper City`
+aggregate: `Times Cities had to be Evacuated` is public_evacuated
+where: `Incident Country` = 'US'
+}
+>>>markdown
+After seeing how many times cities had evacuated due to a hazradous incident, I wanted to see if there was a correlation between number of evacuations and total incident occurances.
+>>>malloy
+run: haz -> {
+group_by: `Shipper City`
+aggregate:
+`Total Incidents` is total_incidents
+`Evacuation Occurred` is total_incidents {where: `Evacuation Indicator` = "Yes"}
+where: `Incident Country` = 'US'
+}
+>>>markdown
+Another question you might have is how these incidents occured, below shows the description of each type of system failure and the amout of times that failure had occured.
+>>>malloy
+run: haz -> {
+group_by: `System Failure Description` is `How Failed Description`
+aggregate: total_incidents
+where: `How Failed Description` is not null
+}
+>>>markdown
+Which cities in the US had the most cases of hazardous waste damaging the enivornment? 
+>>>malloy
+run: haz -> {
+group_by: `Shipper City`
+aggregate: `Instances of Environmental Damage` is environmental_damage
+where: `Incident Country` = 'US'
+}
+>>>markdown
+Of the times the public was evacuated, how many times did employees at workplaces have to be evacuated? In other words, how many times was the harzardous incident so spontaneous that it stopped a regular work day?
+>>>malloy
+run: haz -> {
+group_by: `Shipper City`
+aggregate: employees_evacuated
+where: `Incident Country` = 'US'
+}
+>>>markdown
+So now that we have dissected some statistics of incidents in the US. We want to see if there is a common reason behind the hazardous incidents occurring. To begin, is there a mode of transportation where hazardous material is more likely to occur than others?
+>>>malloy
+run: haz -> {
+aggregate: employees_evacuated
+where: `Incident Country` = 'US'
+}
+>>>markdown
+Break down of incidents by mode of transportation
+    -Shows every mode of transportation in the dataset along with their aggregated incident reports.
+>>>malloy
+run: haz -> {
+group_by: `Mode Of Transportation`
+aggregate: `Total Incidents` is total_incidents
+}
+>>>markdown
+Mode of transportation incidents in each city: Further builds on the prior query, grouping the mode of transportation incidents by city.
+>>>malloy
+run: haz -> {
+group_by: `Incident City`
+nest: Incidents is {
+group_by: `Mode Of Transportation`
+aggregate: total_incidents
+}
+}
+>>>markdown
+Mode of transportation incidents in each state: Further builds on the initial query, grouping the mode of transportation incidents by state.
+>>>malloy
+run: haz -> {
+group_by: `Incident State`
+nest: Incidents is {
+group_by: `Mode Of Transportation`
+aggregate: total_incidents
+}
+}
+>>>markdown
+Another possible common issue is the type of containers storing the hazardous materials. This next query groups incidents by container type and graphs the 10 ten most reoccurring container types.
+>>>malloy
+# bar_chart
+run: haz -> {
+group_by: `Container Description`
+aggregate: `Total Incidents` is total_incidents
+where: `Container Description` is not null
+limit: 10
+}
+>>>markdown
+The next two queries are similar to what I did with my follow-up analysis of the modes of transportation, but are looking at the container types instead.
+>>>malloy
+run: haz -> {
+group_by: `Incident City`
+nest: Incidents is {
+group_by: `Container Description`
+aggregate: total_incidents
+}
+}
+>>>malloy
+run: haz -> {
+group_by: `Incident State`
+nest: Incidents is {
+group_by: `Container Description`
+aggregate: total_incidents
+}
+}
+>>>markdown
+Next, I want to see a basic incident trend across the years given. The chart provides a simple line graph that illustrates the changes in the number of reports submitted across the years that are included in the dataset. Based on the results of the graph, the number of reports submitted has been increasing, most noticeably from 1989-1994.
+>>>malloy
+# line_chart
+run: haz -> {
+group_by: _incident_date.year
+aggregate: total_incidents 
+}
+>>>markdown
+I then wanted to see the incident trends by month. The charts show that incidents occur the most during the summer.
+>>>malloy
+run: haz -> {
+group_by: _incident_date.year
+# line_chart
+nest: monthly_breakdown is {
+group_by: `month` is _incident_date.month 
+aggregate: ` ` is total_incidents
+}
+limit: 100
+}
+>>>markdown
+After seeing the trends of each month of each year, I then wanted to see the average trend combining every year to see if the trend still remained roughly the same. The result aligns with results of the prior query, again showing that most of the incidents occur during the summer.
+>>>malloy
+# line_chart
+run: haz -> {
+group_by: `Month of Year` is _month_of_year
+aggregate: `Total Number of Incidents` is total_incidents
+order_by: `Month of Year` asc
+}
+>>>markdown
+This query generates a map of the U.S. showing the distribution of total incidents in the dataset.
+>>>malloy
+# shape_map
+run: haz -> {
+    group_by: `Incident State`
+    aggregate: total_incidents
+}
+>>>markdown
+Breakdown of incidents in states by year: Expands upon the prior code, breaking up the total incidents by how many occured each year. Also includes U.S. territories.
+>>>malloy
+run: haz -> {
+    group_by: State is `Incident State`
+    aggregate: `Total Incidents` is total_incidents
+    limit: 54
+    # bar_chart (size=spark y.independent)
+    nest: `Reports per Year` is {
+    group_by: dates123 is _incident_date.year
+    aggregate: total_incidents
+    order_by: dates123 asc
+    }
+}
+>>>markdown
+Incidents grouped by Hazardous Class. The goal of this query is to see if the hazardous classes given to the shipments are accurate by seeing which classes had the most amount of incidents. The data shows that the major outliers are hazard classes three and eight.
+>>>malloy
+run: haz -> {
+group_by: `Hazardous Class`
+aggregate: total_incidents
+order_by: `Hazardous Class` desc
+where: `Hazardous Class` is not null
+limit: 1000
+}
+>>>markdown
+To wrap up this analysis, I wanted to combine what I thought were the most important incident factors and organize them to see if there were certain repeat offenders that were a part of a majority of the incidents.
+>>>malloy
+run: haz -> {
+group_by: `Mode Of Transportation`
+aggregate: `Total Incidents Reported` is total_incidents
+# bar_chart (y.independent)
+nest: `Incident Factors` is {
+group_by: `Cause of Failure` is `How Failed Description`
+where: `How Failed Description` is not null
+aggregate:
+`Total Incidents` is total_incidents
+limit: 5
+}
+}
