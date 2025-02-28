@@ -13,3 +13,15 @@ PHSMA publishes the submitted reports [through an online portal](https://www.phm
 # What Was Done In The Analysis
 
 Most of the queries and tables made in this analysis return simple aggregates, with some of them being grouped by various factors such as where the incident occurred, when it occurred, mode of transportation, etc. To give an example, the following is one of the last visualizations made in the analysis:
+
+| <img src="Visualization.png" width="50%"> |
+
+## Directions on how to use the github web editor to run the same analysis
+Are you logged into github? Just press the period key right now. This will load the web editor. Then install the malloy extension. See images below for reference:
+| **Step**   | **Image Preview** |
+|--------|-----------|
+| `Step 1 - Press allow` | <img src="step1.png" width="50%"> |
+| `Step 2 - Click the Blocks, search for Malloy, install` | <img src="step2.png" width="50%"> |
+| `Step 3 - Click Trust` | <img src="step3.png" width="50%"> |
+| `Step 4 - Click a .malloynb file` | <img src="step4.png" width="50%"> |
+| `Step 5 - Press Run` | <img src="step5.png" width="50%"> |
