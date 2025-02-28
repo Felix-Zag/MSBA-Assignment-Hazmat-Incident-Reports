@@ -26,3 +26,8 @@ The data chosen for this project involves hazmat transportation incident reports
 -Code and description of what failed (caused the incident)
 
 With this information (and more provided in the dataset), I have constructed various visuals to help readers better understand what the data is telling us.
+
+Visualization:
+
+The PDF file attached to this repository is the final visual of this analysis...
+[Visualization.pdf](https://github.com/user-attachments/files/19022393/Visualization.pdf)
