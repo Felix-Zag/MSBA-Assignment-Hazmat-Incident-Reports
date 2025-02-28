@@ -29,5 +29,4 @@ With this information (and more provided in the dataset), I have constructed var
 
 Visualization:
 
-The PDF file attached to this repository is the final visual of this analysis...
-[Visualization.pdf](https://github.com/user-attachments/files/19022393/Visualization.pdf)
+The PDF file attached to this repository is the final visual of this analysis. The purpose of this visualization is to break up the total number of incidents that were recorded in the report by the mode of transportation, and further break up the data by what specifically happened to cause the incident.
